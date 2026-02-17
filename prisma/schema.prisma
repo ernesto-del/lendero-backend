@@ -1,0 +1,318 @@
+// LENDERO HUACHI - Prisma Schema
+// Modelo completo de base de datos PostgreSQL
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ==================== MÓDULO DE USUARIOS ====================
+
+model Usuario {
+  id                Int              @id @default(autoincrement())
+  email             String           @unique
+  password_hash     String
+  nombre_completo   String
+  telefono          String?
+  activo            Boolean          @default(true)
+  fecha_creacion    DateTime         @default(now())
+  ultimo_acceso     DateTime?
+  
+  usuario_roles     UsuarioRol[]
+  solicitudes       Solicitud[]      @relation("SolicitudCreador")
+  audit_logs        AuditLog[]
+  notificaciones    Notificacion[]
+
+  @@map("usuarios")
+}
+
+model Rol {
+  id              Int              @id @default(autoincrement())
+  nombre          String           @unique
+  descripcion     String?
+  
+  usuario_roles   UsuarioRol[]
+
+  @@map("roles")
+}
+
+model UsuarioRol {
+  id              Int      @id @default(autoincrement())
+  usuario_id      Int
+  rol_id          Int
+  empresa_id      Int?
+  permisos_json   Json?
+  
+  usuario         Usuario  @relation(fields: [usuario_id], references: [id], onDelete: Cascade)
+  rol             Rol      @relation(fields: [rol_id], references: [id])
+  empresa         Empresa? @relation(fields: [empresa_id], references: [id])
+
+  @@unique([usuario_id, rol_id, empresa_id])
+  @@map("usuario_roles")
+}
+
+// ==================== MÓDULO DE EMPRESAS ====================
+
+model Empresa {
+  id                      Int                 @id @default(autoincrement())
+  rfc                     String              @unique @db.VarChar(13)
+  razon_social            String
+  actividad_economica     String
+  tipo                    String              // DESPACHO, CLIENTE
+  usuario_propietario_id  Int?
+  fecha_alta              DateTime            @default(now())
+  activo                  Boolean             @default(true)
+  
+  usuario_roles           UsuarioRol[]
+  cuentas_bancarias       CuentaBancaria[]
+  productos_fiscales      ProductoFiscal[]
+  conceptos               Concepto[]
+  solicitudes_despacho    Solicitud[]         @relation("SolicitudDespacho")
+  solicitudes_cliente     Solicitud[]         @relation("SolicitudCliente")
+
+  @@map("empresas")
+}
+
+model CuentaBancaria {
+  id          Int      @id @default(autoincrement())
+  empresa_id  Int
+  banco       String
+  clabe       String   @db.VarChar(18)
+  alias       String?
+  activo      Boolean  @default(true)
+  fecha_alta  DateTime @default(now())
+  
+  empresa     Empresa  @relation(fields: [empresa_id], references: [id], onDelete: Cascade)
+
+  @@map("cuentas_bancarias")
+}
+
+// ==================== MÓDULO DE PRODUCTOS Y CONCEPTOS ====================
+
+model ProductoFiscal {
+  id                  Int           @id @default(autoincrement())
+  empresa_despacho_id Int
+  tipo                String
+  descripcion         String?
+  activo              Boolean       @default(true)
+  
+  empresa             Empresa       @relation(fields: [empresa_despacho_id], references: [id], onDelete: Cascade)
+  conceptos           Concepto[]
+  solicitudes         Solicitud[]
+
+  @@map("productos_fiscales")
+}
+
+model Concepto {
+  id                  Int             @id @default(autoincrement())
+  empresa_id          Int
+  producto_fiscal_id  Int
+  descripcion         String
+  unidad_medida       String?
+  activo              Boolean         @default(true)
+  
+  empresa             Empresa         @relation(fields: [empresa_id], references: [id], onDelete: Cascade)
+  producto_fiscal     ProductoFiscal  @relation(fields: [producto_fiscal_id], references: [id], onDelete: Cascade)
+  solicitudes         Solicitud[]
+
+  @@map("conceptos")
+}
+
+// ==================== MÓDULO CORE - SOLICITUDES ====================
+
+model Solicitud {
+  id                        Int                   @id @default(autoincrement())
+  folio                     String                @unique
+  empresa_despacho_id       Int
+  empresa_cliente_id        Int
+  producto_fiscal_id        Int
+  concepto_id               Int
+  monto_total               Decimal               @db.Decimal(10, 2)
+  estatus                   String                @default("PENDIENTE_AUTORIZACION")
+  usuario_solicita_id       Int
+  fecha_solicitud           DateTime              @default(now())
+  fecha_ultima_actualizacion DateTime             @updatedAt
+  notas                     String?               @db.Text
+  
+  empresa_despacho          Empresa               @relation("SolicitudDespacho", fields: [empresa_despacho_id], references: [id])
+  empresa_cliente           Empresa               @relation("SolicitudCliente", fields: [empresa_cliente_id], references: [id])
+  producto_fiscal           ProductoFiscal        @relation(fields: [producto_fiscal_id], references: [id])
+  concepto                  Concepto              @relation(fields: [concepto_id], references: [id])
+  usuario_solicita          Usuario               @relation("SolicitudCreador", fields: [usuario_solicita_id], references: [id])
+  
+  detalles                  SolicitudDetalle[]
+  prefacturas               Prefactura[]
+  datos_pago                DatosPago?
+  comprobantes              ComprobantePago[]
+  dispersiones              Dispersion[]
+  documentos                DocumentoGenerado[]
+
+  @@index([estatus])
+  @@index([fecha_solicitud])
+  @@map("solicitudes")
+}
+
+model SolicitudDetalle {
+  id                    Int       @id @default(autoincrement())
+  solicitud_id          Int
+  concepto_descripcion  String
+  cantidad              Int
+  precio_unitario       Decimal   @db.Decimal(10, 2)
+  subtotal              Decimal   @db.Decimal(10, 2)
+  iva                   Decimal   @db.Decimal(10, 2)
+  total                 Decimal   @db.Decimal(10, 2)
+  
+  solicitud             Solicitud @relation(fields: [solicitud_id], references: [id], onDelete: Cascade)
+
+  @@map("solicitud_detalles")
+}
+
+// ==================== MÓDULO DE PRE-FACTURAS ====================
+
+model Prefactura {
+  id                  Int       @id @default(autoincrement())
+  solicitud_id        Int
+  pdf_url             String
+  xml_datos           Json?
+  fecha_generacion    DateTime  @default(now())
+  autorizada          Boolean   @default(false)
+  usuario_autoriza_id Int?
+  fecha_autorizacion  DateTime?
+  comentarios         String?   @db.Text
+  
+  solicitud           Solicitud @relation(fields: [solicitud_id], references: [id], onDelete: Cascade)
+
+  @@map("prefacturas")
+}
+
+// ==================== MÓDULO DE PAGOS ====================
+
+model DatosPago {
+  id                  Int       @id @default(autoincrement())
+  solicitud_id        Int       @unique
+  cuenta_bancaria_id  Int
+  monto_esperado      Decimal   @db.Decimal(10, 2)
+  fecha_limite_pago   DateTime?
+  
+  solicitud           Solicitud @relation(fields: [solicitud_id], references: [id], onDelete: Cascade)
+
+  @@map("datos_pago")
+}
+
+model ComprobantePago {
+  id                  Int       @id @default(autoincrement())
+  solicitud_id        Int
+  archivo_url         String
+  referencia_bancaria String?
+  fecha_pago          DateTime
+  monto_pagado        Decimal   @db.Decimal(10, 2)
+  usuario_sube_id     Int
+  fecha_subida        DateTime  @default(now())
+  validado            Boolean   @default(false)
+  usuario_valida_id   Int?
+  fecha_validacion    DateTime?
+  notas_validacion    String?   @db.Text
+  
+  solicitud           Solicitud @relation(fields: [solicitud_id], references: [id], onDelete: Cascade)
+
+  @@map("comprobantes_pago")
+}
+
+// ==================== MÓDULO DE DISPERSIONES ====================
+
+model Dispersion {
+  id                    Int                 @id @default(autoincrement())
+  solicitud_id          Int
+  folio_dispersion      String              @unique
+  monto_total_dispersar Decimal             @db.Decimal(10, 2)
+  fecha_programada      DateTime?
+  fecha_ejecutada       DateTime?
+  estatus               String              @default("PENDIENTE")
+  archivo_layout_url    String?
+  
+  solicitud             Solicitud           @relation(fields: [solicitud_id], references: [id], onDelete: Cascade)
+  detalles              DispersionDetalle[]
+
+  @@map("dispersiones")
+}
+
+model DispersionDetalle {
+  id                  Int        @id @default(autoincrement())
+  dispersion_id       Int
+  beneficiario_nombre String
+  beneficiario_rfc    String     @db.VarChar(13)
+  banco_destino       String
+  clabe_destino       String     @db.VarChar(18)
+  monto               Decimal    @db.Decimal(10, 2)
+  concepto_pago       String
+  referencia          String?
+  estatus             String     @default("PENDIENTE")
+  fecha_ejecucion     DateTime?
+  comprobante_url     String?
+  
+  dispersion          Dispersion @relation(fields: [dispersion_id], references: [id], onDelete: Cascade)
+
+  @@map("dispersion_detalles")
+}
+
+// ==================== MÓDULO DE DOCUMENTOS (IA) ====================
+
+model DocumentoGenerado {
+  id                  Int       @id @default(autoincrement())
+  solicitud_id        Int
+  tipo_documento      String
+  contenido_html      String?   @db.Text
+  pdf_url             String
+  version             Int       @default(1)
+  fecha_generacion    DateTime  @default(now())
+  generado_por_ia     Boolean   @default(false)
+  usuario_revisa_id   Int?
+  aprobado            Boolean   @default(false)
+  
+  solicitud           Solicitud @relation(fields: [solicitud_id], references: [id], onDelete: Cascade)
+
+  @@map("documentos_generados")
+}
+
+// ==================== MÓDULO DE AUDITORÍA ====================
+
+model AuditLog {
+  id              Int      @id @default(autoincrement())
+  tabla_afectada  String
+  registro_id     Int
+  accion          String
+  usuario_id      Int
+  datos_antes     Json?
+  datos_despues   Json?
+  ip_address      String?
+  user_agent      String?
+  fecha_hora      DateTime @default(now())
+  
+  usuario         Usuario  @relation(fields: [usuario_id], references: [id])
+
+  @@index([fecha_hora])
+  @@map("audit_log")
+}
+
+// ==================== MÓDULO DE NOTIFICACIONES ====================
+
+model Notificacion {
+  id             Int       @id @default(autoincrement())
+  usuario_id     Int
+  tipo           String
+  asunto         String
+  mensaje        String    @db.Text
+  solicitud_id   Int?
+  leida          Boolean   @default(false)
+  fecha_envio    DateTime  @default(now())
+  fecha_lectura  DateTime?
+  
+  usuario        Usuario   @relation(fields: [usuario_id], references: [id], onDelete: Cascade)
+
+  @@index([usuario_id, leida])
+  @@map("notificaciones")
+}
