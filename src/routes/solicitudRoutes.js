@@ -5,13 +5,13 @@ import {
   getSolicitudById,
   cambiarEstatus,
 } from '../controllers/solicitudController.js';
-import { auth } from '../middleware/auth.js';
+import { authenticateToken } from '../middleware/auth.js';
 
 const router = express.Router();
 
-router.post('/', auth, crearSolicitud);
-router.get('/', auth, getSolicitudes);
-router.get('/:id', auth, getSolicitudById);
-router.patch('/:id/estatus', auth, cambiarEstatus);
+router.post('/', authenticateToken, crearSolicitud);
+router.get('/', authenticateToken, getSolicitudes);
+router.get('/:id', authenticateToken, getSolicitudById);
+router.patch('/:id/estatus', authenticateToken, cambiarEstatus);
 
 export default router;
