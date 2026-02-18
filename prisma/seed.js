@@ -1,140 +1,205 @@
-// LENDERO HUACHI - Seed Data
-// Datos iniciales para desarrollo y testing
-
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
 
 async function main() {
-  console.log('🌱 Iniciando seed de base de datos...');
+  console.log('🌱 Iniciando seed de la base de datos...');
 
-  // Limpiar datos existentes (solo en desarrollo)
-  await prisma.notificacion.deleteMany();
-  await prisma.auditLog.deleteMany();
-  await prisma.documentoGenerado.deleteMany();
-  await prisma.dispersionDetalle.deleteMany();
-  await prisma.dispersion.deleteMany();
-  await prisma.comprobantePago.deleteMany();
-  await prisma.datosPago.deleteMany();
-  await prisma.prefactura.deleteMany();
-  await prisma.solicitudDetalle.deleteMany();
+  // Limpiar datos existentes
+  await prisma.solicitudConcepto.deleteMany();
+  await prisma.solicitudCambioEstatus.deleteMany();
   await prisma.solicitud.deleteMany();
-  await prisma.concepto.deleteMany();
-  await prisma.productoFiscal.deleteMany();
-  await prisma.cuentaBancaria.deleteMany();
+  await prisma.actividadEconomica.deleteMany();
   await prisma.usuarioRol.deleteMany();
-  await prisma.empresa.deleteMany();
-  await prisma.rol.deleteMany();
   await prisma.usuario.deleteMany();
+  await prisma.rol.deleteMany();
+  await prisma.empresa.deleteMany();
+  await prisma.catalogoUsoCfdi.deleteMany();
+  await prisma.catalogoFormaPago.deleteMany();
+  await prisma.catalogoMetodoPago.deleteMany();
+  await prisma.catalogoUnidadMedida.deleteMany();
+
+  console.log('✅ Datos existentes eliminados');
+
+  // ==================== CATÁLOGOS DEL SAT ====================
+  
+  console.log('📋 Creando catálogos del SAT...');
+
+  // Uso de CFDI
+  const usosCfdi = [
+    { id: 'G01', descripcion: 'Adquisición de mercancías', persona_fisica: true, persona_moral: true },
+    { id: 'G03', descripcion: 'Gastos en general', persona_fisica: true, persona_moral: true },
+    { id: 'D01', descripcion: 'Honorarios médicos, dentales y gastos hospitalarios', persona_fisica: true, persona_moral: false },
+    { id: 'D02', descripcion: 'Gastos médicos por incapacidad o discapacidad', persona_fisica: true, persona_moral: false },
+    { id: 'D03', descripcion: 'Gastos funerales', persona_fisica: true, persona_moral: false },
+    { id: 'D04', descripcion: 'Donativos', persona_fisica: true, persona_moral: false },
+    { id: 'P01', descripcion: 'Por definir', persona_fisica: true, persona_moral: true },
+  ];
+
+  for (const uso of usosCfdi) {
+    await prisma.catalogoUsoCfdi.create({ data: uso });
+  }
+
+  // Forma de Pago
+  const formasPago = [
+    { id: '01', descripcion: 'Efectivo' },
+    { id: '02', descripcion: 'Cheque nominativo' },
+    { id: '03', descripcion: 'Transferencia electrónica de fondos' },
+    { id: '04', descripcion: 'Tarjeta de crédito' },
+    { id: '28', descripcion: 'Tarjeta de débito' },
+    { id: '99', descripcion: 'Por definir' },
+  ];
+
+  for (const forma of formasPago) {
+    await prisma.catalogoFormaPago.create({ data: forma });
+  }
+
+  // Método de Pago
+  const metodosPago = [
+    { id: 'PUE', descripcion: 'Pago en una sola exhibición' },
+    { id: 'PPD', descripcion: 'Pago en parcialidades o diferido' },
+  ];
+
+  for (const metodo of metodosPago) {
+    await prisma.catalogoMetodoPago.create({ data: metodo });
+  }
+
+  // Unidades de Medida
+  const unidadesMedida = [
+    { id: 'H87', descripcion: 'Pieza' },
+    { id: 'E48', descripcion: 'Unidad de servicio' },
+    { id: 'ACT', descripcion: 'Actividad' },
+    { id: 'KGM', descripcion: 'Kilogramo' },
+    { id: 'XBX', descripcion: 'Caja' },
+    { id: 'MTR', descripcion: 'Metro' },
+    { id: 'LTR', descripcion: 'Litro' },
+  ];
+
+  for (const unidad of unidadesMedida) {
+    await prisma.catalogoUnidadMedida.create({ data: unidad });
+  }
+
+  console.log('✅ Catálogos del SAT creados');
 
   // ==================== ROLES ====================
-  console.log('Creando roles...');
-  const rolCorporativo = await prisma.rol.create({
-    data: {
-      nombre: 'CORPORATIVO',
-      descripcion: 'Despacho fiscal que presta la estrategia',
-    },
-  });
+  
+  console.log('👥 Creando roles...');
 
   const rolAdministrador = await prisma.rol.create({
     data: {
       nombre: 'ADMINISTRADOR',
-      descripcion: 'Cliente que solicita la estrategia',
+      descripcion: 'Usuario cliente que crea solicitudes de factura',
     },
   });
 
-  const rolConsulta = await prisma.rol.create({
+  const rolCorporativo = await prisma.rol.create({
     data: {
-      nombre: 'CONSULTA',
-      descripcion: 'Usuario de solo lectura',
+      nombre: 'CORPORATIVO',
+      descripcion: 'Usuario del despacho que gestiona solicitudes',
     },
   });
+
+  console.log('✅ Roles creados');
+
+  // ==================== EMPRESAS ====================
+  
+  console.log('🏢 Creando empresas...');
+
+  const empresaCliente1 = await prisma.empresa.create({
+    data: {
+      rfc: 'MEX850101ABC',
+      razon_social: 'MI EMPRESA EJEMPLO SA DE CV',
+      tipo: 'CLIENTE',
+      direccion: 'Av. Reforma 123, Col. Centro',
+      codigo_postal: '06000',
+      activo: true,
+    },
+  });
+
+  const empresaCliente2 = await prisma.empresa.create({
+    data: {
+      rfc: 'COM950101XYZ',
+      razon_social: 'COMERCIALIZADORA DEMO SA DE CV',
+      tipo: 'CLIENTE',
+      direccion: 'Calle Insurgentes 456, Col. Roma',
+      codigo_postal: '06700',
+      activo: true,
+    },
+  });
+
+  console.log('✅ Empresas creadas');
+
+  // ==================== ACTIVIDADES ECONÓMICAS ====================
+  
+  console.log('💼 Creando actividades económicas...');
+
+  await prisma.actividadEconomica.createMany({
+    data: [
+      {
+        empresa_id: empresaCliente1.id,
+        clave: '621111',
+        descripcion: 'Consultoría en computación y servicios relacionados',
+        activo: true,
+      },
+      {
+        empresa_id: empresaCliente1.id,
+        clave: '541211',
+        descripcion: 'Despachos de contadores',
+        activo: true,
+      },
+      {
+        empresa_id: empresaCliente2.id,
+        clave: '466410',
+        descripcion: 'Comercio al por mayor de materias primas',
+        activo: true,
+      },
+      {
+        empresa_id: empresaCliente2.id,
+        clave: '468211',
+        descripcion: 'Comercio al por mayor de productos farmacéuticos',
+        activo: true,
+      },
+    ],
+  });
+
+  console.log('✅ Actividades económicas creadas');
 
   // ==================== USUARIOS ====================
-  console.log('Creando usuarios...');
-  const passwordHash = await bcrypt.hash('password123', 10);
+  
+  console.log('👤 Creando usuarios...');
 
-  // Usuario Corporativo (Despacho)
+  const hashedPassword = await bcrypt.hash('password123', 10);
+
+  const usuarioAdmin1 = await prisma.usuario.create({
+    data: {
+      email: 'juan@miempresa.com',
+      password_hash: hashedPassword,
+      nombre_completo: 'Juan Pérez',
+      telefono: '5559876543',
+      activo: true,
+    },
+  });
+
   const usuarioCorporativo = await prisma.usuario.create({
     data: {
       email: 'maria@fiscalcorp.com',
-      password_hash: passwordHash,
-      nombre_completo: 'María González',
+      password_hash: hashedPassword,
+      nombre_completo: 'María García',
       telefono: '5551234567',
+      activo: true,
     },
   });
 
-  // Usuario Administrador (Cliente)
-  const usuarioAdmin = await prisma.usuario.create({
-    data: {
-      email: 'juan@miempresa.com',
-      password_hash: passwordHash,
-      nombre_completo: 'Juan Pérez',
-      telefono: '5559876543',
-    },
-  });
+  console.log('✅ Usuarios creados');
 
-  // Usuario Consulta
-  const usuarioConsulta = await prisma.usuario.create({
-    data: {
-      email: 'consulta@empresa.com',
-      password_hash: passwordHash,
-      nombre_completo: 'Ana Martínez',
-      telefono: '5555555555',
-    },
-  });
-
-  // ==================== EMPRESAS ====================
-  console.log('Creando empresas...');
+  // ==================== ASIGNAR ROLES ====================
   
-  // Empresa Despacho
-  const empresaDespacho = await prisma.empresa.create({
-    data: {
-      rfc: 'FIS123456ABC',
-      razon_social: 'FISCAL CORPORATIVO SA DE CV',
-      actividad_economica: 'Servicios de consultoría fiscal',
-      tipo: 'DESPACHO',
-      usuario_propietario_id: usuarioCorporativo.id,
-    },
-  });
-
-  // Empresa Cliente 1
-  const empresaCliente1 = await prisma.empresa.create({
-    data: {
-      rfc: 'ABC123456XYZ',
-      razon_social: 'MI EMPRESA SA DE CV',
-      actividad_economica: 'Servicios de Tecnología',
-      tipo: 'CLIENTE',
-      usuario_propietario_id: usuarioAdmin.id,
-    },
-  });
-
-  // Empresa Cliente 2
-  const empresaCliente2 = await prisma.empresa.create({
-    data: {
-      rfc: 'XYZ987654ABC',
-      razon_social: 'COMERCIALIZADORA ABC SA DE CV',
-      actividad_economica: 'Comercio al por mayor',
-      tipo: 'CLIENTE',
-      usuario_propietario_id: usuarioAdmin.id,
-    },
-  });
-
-  // ==================== USUARIO ROLES ====================
-  console.log('Asignando roles a usuarios...');
-  
-  await prisma.usuarioRol.create({
-    data: {
-      usuario_id: usuarioCorporativo.id,
-      rol_id: rolCorporativo.id,
-      empresa_id: empresaDespacho.id,
-    },
-  });
+  console.log('🔐 Asignando roles...');
 
   await prisma.usuarioRol.create({
     data: {
-      usuario_id: usuarioAdmin.id,
+      usuario_id: usuarioAdmin1.id,
       rol_id: rolAdministrador.id,
       empresa_id: empresaCliente1.id,
     },
@@ -142,125 +207,29 @@ async function main() {
 
   await prisma.usuarioRol.create({
     data: {
-      usuario_id: usuarioConsulta.id,
-      rol_id: rolConsulta.id,
-      empresa_id: empresaCliente1.id,
+      usuario_id: usuarioCorporativo.id,
+      rol_id: rolCorporativo.id,
+      empresa_id: null,
     },
   });
 
-  // ==================== CUENTAS BANCARIAS ====================
-  console.log('Creando cuentas bancarias...');
+  console.log('✅ Roles asignados');
+
+  // ==================== RESUMEN ====================
   
-  await prisma.cuentaBancaria.create({
-    data: {
-      empresa_id: empresaDespacho.id,
-      banco: 'BBVA Bancomer',
-      clabe: '012180001234567890',
-      alias: 'Cuenta principal',
-    },
-  });
-
-  await prisma.cuentaBancaria.create({
-    data: {
-      empresa_id: empresaCliente1.id,
-      banco: 'Santander',
-      clabe: '014180009876543210',
-      alias: 'Cuenta operativa',
-    },
-  });
-
-  // ==================== PRODUCTOS FISCALES ====================
-  console.log('Creando productos fiscales...');
-  
-  const productoServProf = await prisma.productoFiscal.create({
-    data: {
-      empresa_despacho_id: empresaDespacho.id,
-      tipo: 'SERVICIOS_PROFESIONALES',
-      descripcion: 'Servicios profesionales independientes',
-    },
-  });
-
-  const productoAsimilado = await prisma.productoFiscal.create({
-    data: {
-      empresa_despacho_id: empresaDespacho.id,
-      tipo: 'ASIMILADO',
-      descripcion: 'Asimilados a salarios',
-    },
-  });
-
-  const productoHonorario = await prisma.productoFiscal.create({
-    data: {
-      empresa_despacho_id: empresaDespacho.id,
-      tipo: 'HONORARIO',
-      descripcion: 'Honorarios profesionales',
-    },
-  });
-
-  // ==================== CONCEPTOS ====================
-  console.log('Creando conceptos...');
-  
-  const conceptoDesarrollo = await prisma.concepto.create({
-    data: {
-      empresa_id: empresaDespacho.id,
-      producto_fiscal_id: productoServProf.id,
-      descripcion: 'Desarrollo de software',
-      unidad_medida: 'Servicio',
-    },
-  });
-
-  await prisma.concepto.create({
-    data: {
-      empresa_id: empresaDespacho.id,
-      producto_fiscal_id: productoServProf.id,
-      descripcion: 'Consultoría tecnológica',
-      unidad_medida: 'Hora',
-    },
-  });
-
-  await prisma.concepto.create({
-    data: {
-      empresa_id: empresaDespacho.id,
-      producto_fiscal_id: productoAsimilado.id,
-      descripcion: 'Nómina ejecutiva',
-      unidad_medida: 'Servicio',
-    },
-  });
-
-  // ==================== SOLICITUD DE EJEMPLO ====================
-  console.log('Creando solicitud de ejemplo...');
-  
-  const solicitud = await prisma.solicitud.create({
-    data: {
-      folio: 'SOL-2025-00001',
-      empresa_despacho_id: empresaDespacho.id,
-      empresa_cliente_id: empresaCliente1.id,
-      producto_fiscal_id: productoServProf.id,
-      concepto_id: conceptoDesarrollo.id,
-      monto_total: 125000.00,
-      estatus: 'PENDIENTE_AUTORIZACION',
-      usuario_solicita_id: usuarioAdmin.id,
-      notas: 'Proyecto Q1 2025 - Desarrollo de módulo de facturación',
-    },
-  });
-
-  // Detalle de solicitud
-  await prisma.solicitudDetalle.create({
-    data: {
-      solicitud_id: solicitud.id,
-      concepto_descripcion: 'Desarrollo de módulo de facturación completo',
-      cantidad: 1,
-      precio_unitario: 125000.00,
-      subtotal: 107758.62,
-      iva: 17241.38,
-      total: 125000.00,
-    },
-  });
-
-  console.log('✅ Seed completado exitosamente!');
-  console.log('\n📧 Usuarios creados:');
-  console.log('   Corporativo: maria@fiscalcorp.com / password123');
-  console.log('   Administrador: juan@miempresa.com / password123');
-  console.log('   Consulta: consulta@empresa.com / password123');
+  console.log('\n🎉 Seed completado exitosamente!\n');
+  console.log('📊 RESUMEN:');
+  console.log('  • Catálogos SAT: Creados');
+  console.log('  • Roles: 2');
+  console.log('  • Empresas: 2');
+  console.log('  • Actividades Económicas: 4');
+  console.log('  • Usuarios: 2\n');
+  console.log('👤 USUARIOS DE PRUEBA:');
+  console.log('  📧 juan@miempresa.com / password123 (ADMINISTRADOR)');
+  console.log('  📧 maria@fiscalcorp.com / password123 (CORPORATIVO)\n');
+  console.log('🏢 EMPRESAS:');
+  console.log('  • MI EMPRESA EJEMPLO SA DE CV (RFC: MEX850101ABC)');
+  console.log('  • COMERCIALIZADORA DEMO SA DE CV (RFC: COM950101XYZ)\n');
 }
 
 main()
