@@ -25,7 +25,7 @@ const PORT = process.env.PORT || 3000;
 
 // CORS
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+  origin: ['https://lendero-frontend.vercel.app', 'http://localhost:5173'],
   credentials: true,
 }));
 
