@@ -1,10 +1,10 @@
 import express from 'express';
 import { getEmpresas, getActividadesEconomicas } from '../controllers/empresaController.js';
-import { auth } from '../middleware/auth.js';
+import { authenticateToken } from '../middleware/auth.js';
 
 const router = express.Router();
 
-router.get('/', auth, getEmpresas);
-router.get('/:id/actividades-economicas', auth, getActividadesEconomicas);
+router.get('/', authenticateToken, getEmpresas);
+router.get('/:id/actividades-economicas', authenticateToken, getActividadesEconomicas);
 
 export default router;
