@@ -1,5 +1,5 @@
-// LENDERO HUACHI - Prisma Schema
-// Modelo completo de base de datos PostgreSQL
+// LENDERO HUACHI - Prisma Schema ACTUALIZADO
+// Modelo completo con módulo de solicitud de factura
 
 generator client {
   provider = "prisma-client-js"
@@ -58,23 +58,37 @@ model UsuarioRol {
 // ==================== MÓDULO DE EMPRESAS ====================
 
 model Empresa {
-  id                      Int                 @id @default(autoincrement())
-  rfc                     String              @unique @db.VarChar(13)
+  id                      Int                     @id @default(autoincrement())
+  rfc                     String                  @unique @db.VarChar(13)
   razon_social            String
-  actividad_economica     String
-  tipo                    String              // DESPACHO, CLIENTE
+  tipo                    String                  // DESPACHO, CLIENTE
+  direccion               String?
+  codigo_postal           String?                 @db.VarChar(5)
   usuario_propietario_id  Int?
-  fecha_alta              DateTime            @default(now())
-  activo                  Boolean             @default(true)
+  fecha_alta              DateTime                @default(now())
+  activo                  Boolean                 @default(true)
   
   usuario_roles           UsuarioRol[]
+  actividades_economicas  ActividadEconomica[]
   cuentas_bancarias       CuentaBancaria[]
   productos_fiscales      ProductoFiscal[]
   conceptos               Concepto[]
-  solicitudes_despacho    Solicitud[]         @relation("SolicitudDespacho")
-  solicitudes_cliente     Solicitud[]         @relation("SolicitudCliente")
+  solicitudes_emisor      Solicitud[]             @relation("SolicitudEmisor")
 
   @@map("empresas")
+}
+
+model ActividadEconomica {
+  id                Int         @id @default(autoincrement())
+  empresa_id        Int
+  clave             String      @db.VarChar(10)
+  descripcion       String
+  activo            Boolean     @default(true)
+  
+  empresa           Empresa     @relation(fields: [empresa_id], references: [id], onDelete: Cascade)
+  solicitudes       Solicitud[]
+
+  @@map("actividades_economicas")
 }
 
 model CuentaBancaria {
@@ -91,6 +105,50 @@ model CuentaBancaria {
   @@map("cuentas_bancarias")
 }
 
+// ==================== CATÁLOGOS DEL SAT ====================
+
+model CatalogoUsoCfdi {
+  id            String      @id @db.VarChar(10)
+  descripcion   String
+  persona_fisica Boolean    @default(true)
+  persona_moral  Boolean    @default(true)
+  activo        Boolean     @default(true)
+  
+  solicitudes   Solicitud[]
+
+  @@map("catalogo_uso_cfdi")
+}
+
+model CatalogoFormaPago {
+  id            String      @id @db.VarChar(10)
+  descripcion   String
+  activo        Boolean     @default(true)
+  
+  solicitudes   Solicitud[]
+
+  @@map("catalogo_forma_pago")
+}
+
+model CatalogoMetodoPago {
+  id            String      @id @db.VarChar(10)
+  descripcion   String
+  activo        Boolean     @default(true)
+  
+  solicitudes   Solicitud[]
+
+  @@map("catalogo_metodo_pago")
+}
+
+model CatalogoUnidadMedida {
+  id            String                @id @db.VarChar(10)
+  descripcion   String
+  activo        Boolean               @default(true)
+  
+  conceptos     SolicitudConcepto[]
+
+  @@map("catalogo_unidad_medida")
+}
+
 // ==================== MÓDULO DE PRODUCTOS Y CONCEPTOS ====================
 
 model ProductoFiscal {
@@ -102,7 +160,6 @@ model ProductoFiscal {
   
   empresa             Empresa       @relation(fields: [empresa_despacho_id], references: [id], onDelete: Cascade)
   conceptos           Concepto[]
-  solicitudes         Solicitud[]
 
   @@map("productos_fiscales")
 }
@@ -117,7 +174,6 @@ model Concepto {
   
   empresa             Empresa         @relation(fields: [empresa_id], references: [id], onDelete: Cascade)
   producto_fiscal     ProductoFiscal  @relation(fields: [producto_fiscal_id], references: [id], onDelete: Cascade)
-  solicitudes         Solicitud[]
 
   @@map("conceptos")
 }
@@ -125,26 +181,51 @@ model Concepto {
 // ==================== MÓDULO CORE - SOLICITUDES ====================
 
 model Solicitud {
-  id                        Int                   @id @default(autoincrement())
-  folio                     String                @unique
-  empresa_despacho_id       Int
-  empresa_cliente_id        Int
-  producto_fiscal_id        Int
-  concepto_id               Int
-  monto_total               Decimal               @db.Decimal(10, 2)
-  estatus                   String                @default("PENDIENTE_AUTORIZACION")
+  id                        Int                     @id @default(autoincrement())
+  folio                     String                  @unique
+  
+  // EMPRESA EMISORA
+  empresa_emisor_id         Int
+  actividad_economica_id    Int
+  
+  // DATOS DEL CLIENTE (receptor)
+  cliente_razon_social      String
+  cliente_rfc               String                  @db.VarChar(13)
+  cliente_direccion         String?
+  cliente_codigo_postal     String?                 @db.VarChar(5)
+  
+  // DATOS DE LA FACTURA
+  metodo_pago_id            String                  @db.VarChar(10)
+  forma_pago_id             String                  @db.VarChar(10)
+  uso_cfdi_id               String                  @db.VarChar(10)
+  
+  // MONTOS
+  subtotal                  Decimal                 @db.Decimal(12, 2)
+  iva                       Decimal                 @db.Decimal(12, 2)
+  monto_total               Decimal                 @db.Decimal(12, 2)
+  
+  // CONTROL
+  estatus                   String                  @default("PENDIENTE_AUTORIZACION")
   usuario_solicita_id       Int
-  fecha_solicitud           DateTime              @default(now())
-  fecha_ultima_actualizacion DateTime             @updatedAt
-  notas                     String?               @db.Text
+  fecha_solicitud           DateTime                @default(now())
+  fecha_ultima_actualizacion DateTime               @updatedAt
+  notas                     String?                 @db.Text
   
-  empresa_despacho          Empresa               @relation("SolicitudDespacho", fields: [empresa_despacho_id], references: [id])
-  empresa_cliente           Empresa               @relation("SolicitudCliente", fields: [empresa_cliente_id], references: [id])
-  producto_fiscal           ProductoFiscal        @relation(fields: [producto_fiscal_id], references: [id])
-  concepto                  Concepto              @relation(fields: [concepto_id], references: [id])
-  usuario_solicita          Usuario               @relation("SolicitudCreador", fields: [usuario_solicita_id], references: [id])
+  // ARCHIVOS ADJUNTOS
+  factura_pdf_url           String?
+  factura_xml_url           String?
+  comprobante_pago_url      String?
   
-  detalles                  SolicitudDetalle[]
+  // RELACIONES
+  empresa_emisor            Empresa                 @relation("SolicitudEmisor", fields: [empresa_emisor_id], references: [id])
+  actividad_economica       ActividadEconomica      @relation(fields: [actividad_economica_id], references: [id])
+  metodo_pago               CatalogoMetodoPago      @relation(fields: [metodo_pago_id], references: [id])
+  forma_pago                CatalogoFormaPago       @relation(fields: [forma_pago_id], references: [id])
+  uso_cfdi                  CatalogoUsoCfdi         @relation(fields: [uso_cfdi_id], references: [id])
+  usuario_solicita          Usuario                 @relation("SolicitudCreador", fields: [usuario_solicita_id], references: [id])
+  
+  conceptos                 SolicitudConcepto[]
+  cambios_estatus           SolicitudCambioEstatus[]
   prefacturas               Prefactura[]
   datos_pago                DatosPago?
   comprobantes              ComprobantePago[]
@@ -153,22 +234,40 @@ model Solicitud {
 
   @@index([estatus])
   @@index([fecha_solicitud])
+  @@index([empresa_emisor_id])
   @@map("solicitudes")
 }
 
-model SolicitudDetalle {
-  id                    Int       @id @default(autoincrement())
+model SolicitudConcepto {
+  id                    Int                     @id @default(autoincrement())
   solicitud_id          Int
-  concepto_descripcion  String
-  cantidad              Int
-  precio_unitario       Decimal   @db.Decimal(10, 2)
-  subtotal              Decimal   @db.Decimal(10, 2)
-  iva                   Decimal   @db.Decimal(10, 2)
-  total                 Decimal   @db.Decimal(10, 2)
+  cantidad              Decimal                 @db.Decimal(10, 2)
+  unidad_medida_id      String                  @db.VarChar(10)
+  clave_producto        String                  @db.VarChar(20)
+  descripcion           String
+  precio_unitario       Decimal                 @db.Decimal(12, 2)
+  subtotal              Decimal                 @db.Decimal(12, 2)
+  iva                   Decimal                 @db.Decimal(12, 2)
+  importe               Decimal                 @db.Decimal(12, 2)
   
-  solicitud             Solicitud @relation(fields: [solicitud_id], references: [id], onDelete: Cascade)
+  solicitud             Solicitud               @relation(fields: [solicitud_id], references: [id], onDelete: Cascade)
+  unidad_medida         CatalogoUnidadMedida    @relation(fields: [unidad_medida_id], references: [id])
 
-  @@map("solicitud_detalles")
+  @@map("solicitud_conceptos")
+}
+
+model SolicitudCambioEstatus {
+  id                  Int       @id @default(autoincrement())
+  solicitud_id        Int
+  estatus_anterior    String?
+  estatus_nuevo       String
+  usuario_cambio_id   Int
+  fecha_cambio        DateTime  @default(now())
+  comentario          String?   @db.Text
+  
+  solicitud           Solicitud @relation(fields: [solicitud_id], references: [id], onDelete: Cascade)
+
+  @@map("solicitud_cambios_estatus")
 }
 
 // ==================== MÓDULO DE PRE-FACTURAS ====================
